@@ -1,7 +1,8 @@
 name: Tests
 
-# Isolated synthetic demo: the expected old assertion failure is verified inside
-# a successful job. Product pull-request workflows remain unchanged.
+# Isolated green-only demo on a fresh runner. The old implementation
+# already failed its expected assertions in run 41994521012; do not rerun it.
+# Product pull-request workflows remain unchanged.
 on:
   workflow_dispatch:
 
@@ -14,46 +15,18 @@ concurrency:
 
 jobs:
   app:
-    name: Sidebar filter old-red new-green demo
+    name: Sidebar filter screenshots on a fresh runner
     runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
           persist-credentials: false
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Verify old sidebar fails the selection assertion
-        shell: bash
-        run: |
-          make gen
-          git show 84c89f72dfa2d9cab03e5276bba43cf8cf764282:Sources/HerdrM/SidebarView.swift > Sources/HerdrM/SidebarView.swift
-          set +e
-          xcodebuild test -project HerdrM.xcodeproj -scheme HerdrM -configuration Debug -derivedDataPath build -destination 'platform=macOS,arch=arm64' CODE_SIGN_IDENTITY='-' CODE_SIGN_STYLE=Manual -skipPackagePluginValidation -only-testing:HerdrMTests/SidebarSpaceRevealUIUXTests/testRestoredPaneAndInputFocusKeepHighlightAlignedWithSpaceFilter > /tmp/herdr-demo-red.log 2>&1
-          red_status=$?
-          set -e
-          git restore --source=HEAD -- Sources/HerdrM/SidebarView.swift
-          python3 - "$red_status" <<'PYCODE'
-          import re
-          import sys
-          from pathlib import Path
-          log = Path('/tmp/herdr-demo-red.log').read_text()
-          test = 'testRestoredPaneAndInputFocusKeepHighlightAlignedWithSpaceFilter'
-          checks = [
-              int(sys.argv[1]) != 0,
-              re.search(r'error: -\[HerdrMTests\.SidebarSpaceRevealUIUXTests ' + test + r'\] : XCTAssertTrue failed - DEMO_FILTER_ALL_SPACES_SELECTED', log),
-              re.search(r"Test Case '-\[HerdrMTests\.SidebarSpaceRevealUIUXTests " + test + r"\]' failed", log),
-              re.search(r'Executed 1 test, with [1-9][0-9]* failures \(0 unexpected\)', log),
-          ]
-          if not all(checks):
-              print(log[-20000:])
-              raise SystemExit('Old implementation did not fail the expected sidebar selection assertion.')
-          print('Verified expected old failure: All Spaces is not selected after restoring a pane.')
-          PYCODE
-          rm -f /tmp/herdr-pr-demo/sidebar-filter-all-spaces.png /tmp/herdr-pr-demo/sidebar-filter-space-2.png
       - name: Verify fixed sidebar and capture synthetic screenshots
         shell: bash
         run: |
+          make gen
           set -o pipefail
           xcodebuild test -project HerdrM.xcodeproj -scheme HerdrM -configuration Debug -derivedDataPath build -destination 'platform=macOS,arch=arm64' CODE_SIGN_IDENTITY='-' CODE_SIGN_STYLE=Manual -skipPackagePluginValidation -only-testing:HerdrMTests/SidebarSpaceRevealUIUXTests/testRestoredPaneAndInputFocusKeepHighlightAlignedWithSpaceFilter 2>&1 | tee /tmp/herdr-demo-green.log
       - name: Save synthetic UI demos and assertion evidence
@@ -63,6 +36,5 @@ jobs:
           name: synthetic-ui-demos
           path: |
             /tmp/herdr-pr-demo/*.png
-            /tmp/herdr-demo-red.log
             /tmp/herdr-demo-green.log
           if-no-files-found: error
