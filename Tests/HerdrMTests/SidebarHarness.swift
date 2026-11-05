@@ -535,6 +535,7 @@ final class SidebarHarness {
 
     /// Render the whole sidebar to a PNG (for eyeballing a layout change).
     func writeSnapshot(to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let rep = try XCTUnwrap(root.bitmapImageRepForCachingDisplay(in: root.bounds))
         root.cacheDisplay(in: root.bounds, to: rep)
         let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))

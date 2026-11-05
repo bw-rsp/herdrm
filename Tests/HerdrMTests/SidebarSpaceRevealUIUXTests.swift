@@ -98,7 +98,14 @@ final class SidebarSpaceRevealUIUXTests: XCTestCase {
                            "\(context): passive focus scroll offset \(originalOffset) -> \(sidebar.scrollOffset)")
 
             for inputClick in 1...2 {
+                let demoName = "input-focus-\(grouped ? "grouped" : "flat")-\(index == 0 ? "agent" : "terminal")"
+                if index < 2 && inputClick == 1 {
+                    try sidebar.writeSnapshot(to: URL(fileURLWithPath: "/tmp/herdr-pr-demo/\(demoName)-before.png"))
+                }
                 try sidebar.clickInputTerminal(click.pane)
+                if index < 2 && inputClick == 1 {
+                    try sidebar.writeSnapshot(to: URL(fileURLWithPath: "/tmp/herdr-pr-demo/\(demoName)-after.png"))
+                }
                 XCTAssertEqual(sidebar.model.selectedPane, click.pane)
                 XCTAssertEqual(sidebar.scrollOffset, originalOffset, accuracy: 1,
                                "\(context), input click \(inputClick): focusing input must not scroll to the space")
