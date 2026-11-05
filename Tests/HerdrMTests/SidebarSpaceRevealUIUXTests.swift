@@ -349,6 +349,8 @@ final class SidebarSpaceRevealUIUXTests: XCTestCase {
     }
 
     func testRestoredPaneAndInputFocusKeepHighlightAlignedWithSpaceFilter() throws {
+        let demoDirectory = URL(fileURLWithPath: "/tmp/herdr-pr-demo", isDirectory: true)
+        try FileManager.default.createDirectory(at: demoDirectory, withIntermediateDirectories: true)
         let firstAgent = PaneRef(deviceID: remote.id, paneID: "pane-0")
         let secondAgent = PaneRef(deviceID: remote.id, paneID: "pane-1")
         let secondSpace = SpaceRef(deviceID: remote.id, workspaceID: "ws-1")
@@ -370,9 +372,10 @@ final class SidebarSpaceRevealUIUXTests: XCTestCase {
         XCTAssertNil(sidebar.model.selectedSpace)
         XCTAssertEqual(sidebar.model.visibleAgents.count, 2)
         XCTAssertEqual(sidebar.model.visibleTerminals.count, 1)
-        XCTAssertTrue(try sidebar.spaceRowIsSelected("All Spaces"))
+        XCTAssertTrue(try sidebar.spaceRowIsSelected("All Spaces"), "DEMO_FILTER_ALL_SPACES_SELECTED")
         XCTAssertFalse(try sidebar.spaceRowIsSelected("Space 1"), "The restored pane's owner is not an active filter")
         XCTAssertFalse(try sidebar.spaceRowIsSelected("Space 2"))
+        try sidebar.writeSnapshot(to: demoDirectory.appendingPathComponent("sidebar-filter-all-spaces.png"))
 
         try sidebar.clickSpaceTitle("Space 2")
         XCTAssertEqual(sidebar.model.selectedSpace, secondSpace)
@@ -390,6 +393,7 @@ final class SidebarSpaceRevealUIUXTests: XCTestCase {
             XCTAssertFalse(try sidebar.spaceRowIsSelected("All Spaces"))
             XCTAssertEqual(sidebar.scrollOffset, filteredOffset, accuracy: 1)
         }
+        try sidebar.writeSnapshot(to: demoDirectory.appendingPathComponent("sidebar-filter-space-2.png"))
 
         try sidebar.clickSpaceTitle("All Spaces")
         XCTAssertNil(sidebar.model.selectedSpace)
