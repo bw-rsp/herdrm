@@ -292,6 +292,10 @@ final class AgentUnreadUIUXTests: XCTestCase {
         try first?.clickAgentTitleWithoutSettling("Agent 1")
         XCTAssertFalse(firstModel.isUnread(entries[0]))
         XCTAssertTrue(firstModel.isUnread(entries[1]))
+        let demoDirectory = URL(fileURLWithPath: "/tmp/herdr-pr-demo", isDirectory: true)
+        try FileManager.default.createDirectory(at: demoDirectory, withIntermediateDirectories: true)
+        first?.settleSidebar()
+        try first?.writeSnapshot(to: demoDirectory.appendingPathComponent("unread-before-relaunch.png"))
         first = nil
 
         // A new real AppModel loads the same persisted state through the harness.
@@ -311,6 +315,7 @@ final class AgentUnreadUIUXTests: XCTestCase {
         XCTAssertTrue(model.isUnread(entries[1]), "A reconnect classification gap does not read B")
         XCTAssertTrue(model.updateSnapshotAttention(agents: done, deviceID: deviceID).isEmpty)
         reopened.settleSidebar()
+        try reopened.writeSnapshot(to: demoDirectory.appendingPathComponent("unread-after-relaunch.png"))
         try reopened.clickAgentTitleWithoutSettling("Agent 2")
         XCTAssertFalse(model.isUnread(entries[1]))
 
