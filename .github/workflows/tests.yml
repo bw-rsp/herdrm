@@ -1,11 +1,7 @@
 name: Tests
 
-# Every pull request runs the tests a contributor runs locally, plus a secret
-# scan, so a regression shows up on the PR instead of after a release.
+# Isolated synthetic demo branch; product CI remains on the product branch.
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,17 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  kit:
-    name: HerdrKit (make kit-test)
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - run: make kit-test
-
   app:
-    name: App behavior (make uiux-test)
+    name: Synthetic unread recovery screenshot
     runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -34,25 +21,33 @@ jobs:
           persist-credentials: false
       - name: Install XcodeGen
         run: brew install xcodegen
-      - run: make uiux-test
-
-  secrets:
-    name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
-    env:
-      GITLEAKS_VERSION: "8.30.1"
-      # SHA-256 of gitleaks_8.30.1_linux_x64.tar.gz; matches the digest GitHub
-      # lists for the release asset (checked 2026-10-15). Update both together.
-      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Install gitleaks
+      - name: Verify unread recovery and capture its XCTest attachment
         run: |
-          curl -sfL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v$GITLEAKS_VERSION/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "$GITLEAKS_SHA256  gitleaks.tar.gz" | sha256sum -c -
-          tar -xzf gitleaks.tar.gz gitleaks
-      # Whole history; known false positives are listed in .gitleaksignore.
-      - run: ./gitleaks git --no-banner --redact .
+          make gen
+          xcodebuild test -project HerdrM.xcodeproj -scheme HerdrM -configuration Debug -derivedDataPath build -destination 'platform=macOS,arch=arm64' CODE_SIGN_IDENTITY='-' CODE_SIGN_STYLE=Manual -skipPackagePluginValidation -only-testing:HerdrMTests/AgentUnreadUIUXTests/testRecoveryStatusEventsKeepUnreadVisibleAndPersistedUntilOpened
+      - name: Export the fake sidebar attachment from the test result
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import shutil
+          import subprocess
+          results = list(Path('build/Logs/Test').glob('*.xcresult'))
+          if len(results) != 1:
+              raise SystemExit(f'Expected the single targeted test result, found {len(results)}')
+          exported = Path('/tmp/herdr-unread-recovery-attachments')
+          subprocess.run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', str(results[0]), '--output-path', str(exported)], check=True)
+          screenshots = list(exported.rglob('*.png'))
+          if len(screenshots) != 1:
+              raise SystemExit(f'Expected the one fake sidebar PNG attachment, found {len(screenshots)}')
+          destination = Path('/tmp/herdr-pr-demo')
+          destination.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(screenshots[0], destination / 'unread-recovery.png')
+          print('Exported the real SidebarView XCTest attachment.')
+          PYCODE
+      - name: Save synthetic UI demos
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: synthetic-ui-demos
+          path: /tmp/herdr-pr-demo/*.png
+          if-no-files-found: error
